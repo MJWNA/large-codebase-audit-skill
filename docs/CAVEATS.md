@@ -1,6 +1,6 @@
 # Caveats — Things the Anthropic Article Doesn't Tell You
 
-These were discovered by trialing the methodology end-to-end on a real production codebase (multi-tenant Next.js 15 dashboard, 865+ TypeScript files). Each caveat includes the symptom, the root cause, and the mitigation.
+These were discovered by trialing the methodology end-to-end on a real codebase. Each caveat includes the symptom, the root cause, and the mitigation.
 
 ---
 

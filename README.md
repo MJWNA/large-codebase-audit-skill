@@ -181,7 +181,7 @@ This document is **the input you feed back into the skill** for the next iterati
 
 ## ⚠️ Real-world caveats (from trial)
 
-This skill was **trialed end-to-end on a real production codebase** (multi-tenant Next.js 15 dashboard, 865+ TypeScript files across `app/`, `lib/`, `components/`) before being published. The trial surfaced 15 caveats not covered in the Anthropic article — **read [docs/CAVEATS.md](docs/CAVEATS.md) before running**.
+This skill was **trialed end-to-end on a real codebase** before being published. The trial surfaced 15 caveats not covered in the Anthropic article — **read [docs/CAVEATS.md](docs/CAVEATS.md) before running**.
 
 Highlights:
 

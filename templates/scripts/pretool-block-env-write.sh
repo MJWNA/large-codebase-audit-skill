@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # PreToolUse hook: block writes/edits to .env* files (except .env.example).
-# Reason: commit 11bf24a hardened .env handling — never let an agent leak secrets back into the tree.
+# Reason: env files contain secrets that belong in a secret store, not the repo tree.
 set -euo pipefail
 
 PAYLOAD=$(cat || true)
@@ -30,7 +30,7 @@ case "$BASENAME" in
   .env|.env.*)
     cat >&2 <<EOF
 [blocked] $FILE_PATH is a .env file. Writes blocked by project-scope safety hook.
-Reason: commit 11bf24a (chore(security): tighten env gitignore) — env values are managed via Vercel + Neon, not in-repo.
+Reason: env values are managed via your secret store / hosting platform, not in-repo.
 If you genuinely need to update .env.example (the only allowed env file), edit that exact path.
 EOF
     exit 2

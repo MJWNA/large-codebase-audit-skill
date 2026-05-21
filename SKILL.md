@@ -130,4 +130,4 @@ The Anthropic article omits these — discovered during trial on a real codebase
 - `docs/CAVEATS.md` — full caveat list with mitigations
 - `docs/ANTHROPIC-ARTICLE-NOTES.md` — distilled article notes
 - `templates/` — script + skill + nested-CLAUDE.md templates
-- `examples/smd-trial-summary.md` — the trial run that informed this skill
+- `examples/trial-workflow.md` — the shape of an audit-and-fix cycle on a typical un-tuned codebase
