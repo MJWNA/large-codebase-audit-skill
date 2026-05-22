@@ -1,15 +1,17 @@
 # 🏗️ Large Codebase AI-Layer Audit
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Claude Code](https://img.shields.io/badge/Claude%20Code-Skill-D97757?logo=anthropic&logoColor=white)](https://docs.claude.com/en/docs/claude-code)
-[![Status](https://img.shields.io/badge/Status-Beta-orange)](#status)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-Skill-D97757?logo=anthropic&logoColor=white)](https://code.claude.com/docs/en)
+[![Version](https://img.shields.io/badge/Version-v2.0.0-blue)](CHANGELOG.md)
 [![GitHub stars](https://img.shields.io/github/stars/MJWNA/large-codebase-audit-skill?style=flat)](https://github.com/MJWNA/large-codebase-audit-skill/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/MJWNA/large-codebase-audit-skill)](https://github.com/MJWNA/large-codebase-audit-skill/issues)
 [![Last commit](https://img.shields.io/github/last-commit/MJWNA/large-codebase-audit-skill)](https://github.com/MJWNA/large-codebase-audit-skill/commits/main)
 
-> **A Claude Code skill that audits and applies Anthropic's "How Claude Code works in large codebases" methodology to any Claude Code project — using parallel forked sub-agents to evaluate and fix all 7 AI-layer components in one cycle.**
+> **A Claude Code skill that audits and improves a project's entire AI layer in one cycle, using parallel forked sub-agents. Aligned with the [Anthropic article](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start) and cross-referenced against the [official Claude Code docs](https://code.claude.com/docs/en).**
 
-The Anthropic article on [working in large codebases](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start) lays out 9 strategies for making Claude Code effective on real codebases — lean CLAUDE.md, path-scoped skills, self-improving hooks, LSP-backed symbol search, exploration sub-agents, and more. This skill **operationalises the whole methodology** as a single audit-and-fix workflow that completes in a single Claude Code session.
+The Anthropic article's central thesis is that **the harness matters as much as the model**. This skill audits the harness as a whole — across 9 official surfaces — then applies fixes in the order the article recommends (CLAUDE.md first), with disjoint write scopes so parallel forks never collide.
+
+> 🆕 **Version 2.0.0** brings the skill into alignment with the official docs. See [CHANGELOG.md](CHANGELOG.md) for breaking changes (templates removed, surfaces expanded from 7 to 9, factual corrections).
 
 ---
 
@@ -22,7 +24,7 @@ The Anthropic article on [working in large codebases](https://claude.com/blog/ho
 - [Quick start](#-quick-start)
 - [Installation](#-installation)
 - [Output](#-output)
-- [Real-world caveats](#-real-world-caveats-from-trial)
+- [Operational caveats](#-operational-caveats)
 - [Requirements](#-requirements)
 - [Contributing](#-contributing)
 - [Acknowledgements](#-acknowledgements)
@@ -32,205 +34,232 @@ The Anthropic article on [working in large codebases](https://claude.com/blog/ho
 
 ## 🎯 Why this exists
 
-The Anthropic article and [its YouTube companion](https://www.youtube.com/results?search_query=cole+medin+anthropic+large+codebases) lay out the methodology clearly, but **applying it to a real, organically-grown codebase by hand takes hours and introduces drift between layers**. A typical mid-sized Next.js or Rails project has:
+Applying the Anthropic methodology to a real, organically-grown codebase by hand takes hours and introduces drift between layers. A typical mid-sized Next.js, Rails, or Django project has:
 
-- A bloated root `CLAUDE.md` with embedded rule indexes (re-rots on every rule add)
-- Always-loaded rules that should be path-scoped (every session pays the cost)
-- Zero path-scoped skills for recurring task shapes
-- No self-improving Stop hook
-- No sub-agents to keep exploration out of the editing context window
-- No LSP-backed symbol search
-- MCP servers configured at the wrong scope
+- 📜 A bloated root `CLAUDE.md` with embedded rule indexes (re-rots on every rule add)
+- 📋 Always-loaded rules that should be path-scoped (every session pays the cost)
+- 🎯 Zero path-scoped skills for recurring task shapes
+- 🪝 No self-improving Stop hook, no `InstructionsLoaded` diagnostic
+- 🤖 No sub-agents to keep exploration out of the editing context window
+- 🔎 No LSP-backed symbol search
+- 🔌 MCP servers configured at the wrong scope, or missing entirely
+- 🧠 Stale or absent auto-memory entries
+- 📏 Unbounded skill-listing budget eating context at every session start
 
-This skill walks all 7 layers in **one parallel-forked cycle**, applies fixes with non-overlapping write scopes, and produces a takeaways document you can feed back into the next iteration.
+This skill walks all 9 surfaces in **one parallel-forked cycle**, applies fixes with non-overlapping write scopes, and produces a session log you can feed back into the next iteration.
 
 ---
 
 ## 🔍 What it audits
 
-The skill dispatches **6 parallel read-only forks**, one per AI-layer concern:
+The 9 official AI-layer surfaces, synthesised from Anthropic's article and the [official docs](https://code.claude.com/docs/en):
 
-| Fork | Audits |
-|---|---|
-| 📜 **CLAUDE.md hierarchy** | Root file length, nested CLAUDE.md presence/absence, redundancy with `ARCHITECTURE.md` |
-| 📋 **Rules** | Always-loaded vs path-scoped, redundancy, rule-vs-skill misclassification |
-| 🛠️ **Skills + agents + commands** | Project-scope inventory, path-scope coverage, missing workflow skills |
-| 🪝 **Hooks** | SessionStart, Stop (self-improving), PreToolUse safety guardrails |
-| 🔌 **MCP + LSP** | Project-scope MCP coverage, missing TS LSP, custom-vs-plugin tradeoff |
-| 🗺️ **Codebase structure** | Codebase map content, nested-CLAUDE.md placement recommendations |
+| # | Surface | Where it lives | Key audit question |
+|---|---|---|---|
+| 1 | 📜 CLAUDE.md hierarchy | Root + nested `CLAUDE.md` | Root under 80 lines, pointers-only? Nested files at meaningful sub-tree boundaries? |
+| 2 | 📋 Rules | `.claude/rules/*.md` | Anything always-loaded that could be path-scoped? Rules that are skills in disguise? |
+| 3 | 🎯 Skills | `.claude/skills/*/SKILL.md` | Path-scoped triggers correct? Supporting files bundled inside the skill dir? |
+| 4 | 🤖 Sub-agents | `.claude/agents/*.md` | Read-only explorer agent? DB / log inspectors? |
+| 5 | 🪝 Hooks | `.claude/settings.json` → `hooks` | Self-improving Stop hook? `InstructionsLoaded` for diagnostics? PreToolUse guardrails? |
+| 6 | 🔌 MCP servers | `.mcp.json` | Project-scope MCPs registered? `disableSkillShellExecution` where needed? |
+| 7 | 🔎 LSP | `.lsp.json` | Symbol-server configured for the dominant language? Binary installed? |
+| 8 | 📦 Plugins | `.claude-plugin/plugin.json` | Is the project itself a plugin? Bundled skills marketplace-ready? |
+| 9 | 🧠 Auto-memory | `~/.claude/projects/<proj>/memory/` | Benefitting from auto-memory? Stale entries (>90 days)? |
 
-Each fork returns a structured punch list — file paths, line counts, proposed actions.
+Plus the settings.json budget knobs that affect all of the above: `skillListingBudgetFraction`, `maxSkillDescriptionChars`, `skillOverrides`, `claudeMdExcludes`.
 
 ---
 
 ## 🔧 What it fixes
 
-After synthesis, **7+ parallel write forks** apply the fixes with **explicit non-overlapping write scopes** to prevent races:
+Fixes are dispatched in **the article's stated order** (the article is explicit: *"CLAUDE.md files come first"*):
 
-| Layer | Typical fix |
-|---|---|
-| Root `CLAUDE.md` | Trim to under 80 lines, embed codebase map at top, leave rule pointers |
-| Nested `CLAUDE.md` | Create 5-7 files at high-traffic subdirectories with 6-10 load-bearing bullets each |
-| Hooks | Install self-improving Stop hook, SessionStart git-context hook, 3+ PreToolUse safety guardrails |
-| Skills | Generate path-scoped workflow skills for recurring task shapes (add-api-route, add-cron-job, add-migration, etc.) |
-| Sub-agents | Install `explorer` (codebase) + `db-investigator` (read-only DB) sub-agents |
-| Rules | Path-scope always-loaded domain rules, delete duplicates, generate `_CONSOLIDATION_PROPOSALS.md` for human review |
-| MCP + LSP | Install `typescript-language-server` globally, create project-scope `.mcp.json` with Neon/Prisma/etc. |
+1. 📜 Root `CLAUDE.md` — trim, restructure, add pointers
+2. 📜 Nested `CLAUDE.md` — create at meaningful sub-tree boundaries
+3. 🪝 Hooks + settings.json — add self-improving Stop, `InstructionsLoaded`, safety guardrails, tune skill-budget knobs
+4. 🎯 Skills — create path-scoped skills for recurring task shapes, fix frontmatter
+5. 🤖 Sub-agents — explorer and inspector agents
+6. 📦 Plugins — if the project is a plugin, validate the manifest
+7. 🔎 LSP — install binary, write `.lsp.json`
+8. 🔌 MCP — register project-scope servers in `.mcp.json` (requires Claude Code restart)
+9. 🧠 Auto-memory — prune stale entries, surface gaps
+
+Each fix runs in its own forked sub-agent with an **exclusive write scope** — two forks never touch the same file. Rule consolidations and rule-to-skill conversions are *deferred* to a `_CONSOLIDATION_PROPOSALS.md` doc for human review (consolidations break pointers other forks rely on inside the same cycle).
 
 ---
 
 ## ⚙️ How it works
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  User: "audit my AI layer"                                       │
-└─────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Phase 1 — Audit (6 parallel read-only forks)                   │
-│  CLAUDE.md │ Rules │ Skills │ Hooks │ MCP/LSP │ Codebase map    │
-│  Each returns a structured punch list → main context             │
-└─────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Phase 2 — Synthesise + plan                                    │
-│  Map fixes to disjoint write scopes. Confirm with user.         │
-└─────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Phase 3 — Fix (7+ parallel write forks)                        │
-│  Each owns ONE write scope. No file collisions.                  │
-└─────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Phase 4 — Wrap                                                 │
-│  Verify counts │ Write takeaways doc │ Smoke-test hooks         │
-└─────────────────────────────────────────────────────────────────┘
+Phase 0 — Pre-flight                  (sequential, ~1-2 min)
+   ├─ Verify git repo root
+   ├─ Verify fork-mode (CLAUDE_CODE_FORK_SUBAGENT=1) or fall back
+   ├─ Read root CLAUDE.md, ARCHITECTURE.md, .claude/settings.json
+   ├─ Capture InstructionsLoaded diagnostic (if available)
+   └─ Identify dominant tech stack
+
+Phase 1 — Audit                       (7 parallel forks, single message)
+   ├─ Fork A: CLAUDE.md hierarchy     │
+   ├─ Fork B: Rules                   │
+   ├─ Fork C: Skills + agents + cmds  │  All read-only.
+   ├─ Fork D: Hooks + settings        │  Each returns a punch list
+   ├─ Fork E: MCP + LSP + plugins     │  under 800 words.
+   ├─ Fork F: Codebase structure      │
+   └─ Fork G: Auto-memory             │
+
+Phase 2 — Synthesise + order          (sequential, ~3-5 min)
+   ├─ Merge punch lists
+   ├─ Map every fix to one fork, one write scope
+   ├─ Order per article hierarchy (CLAUDE.md first)
+   └─ Confirm with user unless --yes / standing authorisation
+
+Phase 3 — Fix                         (parallel forks, single message)
+   ├─ Fix-1 → root CLAUDE.md          │  Each fork:
+   ├─ Fix-2 → nested CLAUDE.md        │   • States exclusive write scope
+   ├─ Fix-3 → hooks + settings        │   • Knows other forks' scopes
+   ├─ Fix-4 → skills                  │   • Self-validates (jq, bash -n)
+   ├─ Fix-5 → sub-agents              │   • Reports back: files,
+   ├─ Fix-6 → plugins                 │     line counts, surprises
+   ├─ Fix-7 → LSP                     │
+   ├─ Fix-8 → MCP                     │
+   ├─ Fix-9 → auto-memory prune       │
+   └─ Fix-10 → rules (safe trims only)│
+
+Phase 4 — Wrap + cadence              (sequential)
+   ├─ Verification commands
+   ├─ Write .claude/session/large-codebase-audit-YYYY-MM-DD.md
+   ├─ Recommend DRI if multi-person org
+   ├─ Set "Next review due" date (today + 90 days)
+   └─ Surface critical "before next session" actions
 ```
 
 ---
 
 ## ⚡ Quick start
 
-```bash
-# 1. Install the skill (see Installation section below)
-git clone git@github.com:MJWNA/large-codebase-audit-skill.git
-cp -r large-codebase-audit-skill/SKILL.md ~/.claude/skills/large-codebase-audit/SKILL.md
+After [installing](#-installation) the skill:
 
-# 2. Inside any Claude Code session in any project:
-> audit my AI layer
-> apply Anthropic large-codebase setup
-> large codebase audit
+```
+You: audit my AI layer
+Claude: [Phase 0: pre-flight checks, fork-mode verify, InstructionsLoaded diagnostic]
+        [Phase 1: dispatches 7 read-only audit forks in parallel]
+        [returns synthesised plan]
+You: yes go ahead
+Claude: [Phase 3: dispatches fix forks in ordered, disjoint scopes]
+        [Phase 4: writes session log with DRI + next-review-date]
 ```
 
-The skill will fire on those trigger phrases (or close variants). It runs Phase 1 immediately, presents the synthesis, and waits for your confirmation before Phase 3 unless you say "execute" or "go ahead".
+Other trigger phrases:
+- "audit Claude config"
+- "large codebase audit"
+- "tune my .claude"
+- "apply Anthropic patterns"
+- "harness audit"
 
 ---
 
 ## 📦 Installation
 
-### Option A — Direct copy (simplest)
+### Option A — User scope (recommended)
+
+Install the skill globally so it's available in every project:
 
 ```bash
-git clone git@github.com:MJWNA/large-codebase-audit-skill.git
+git clone git@github.com:MJWNA/large-codebase-audit-skill.git /tmp/lca
 mkdir -p ~/.claude/skills/large-codebase-audit
-cp large-codebase-audit-skill/SKILL.md ~/.claude/skills/large-codebase-audit/SKILL.md
+cp /tmp/lca/SKILL.md ~/.claude/skills/large-codebase-audit/SKILL.md
+mkdir -p ~/.claude/skills/large-codebase-audit/docs
+cp /tmp/lca/docs/CAVEATS.md ~/.claude/skills/large-codebase-audit/docs/CAVEATS.md
+rm -rf /tmp/lca
 ```
 
-That installs the skill at user scope. Available in every Claude Code session.
+The skill auto-loads in any Claude Code session via its description's trigger phrases.
 
 ### Option B — Project scope
 
+Per-project install (rarely needed — this skill audits projects, so user scope makes more sense):
+
 ```bash
-mkdir -p .claude/skills/large-codebase-audit
-cp /path/to/large-codebase-audit-skill/SKILL.md .claude/skills/large-codebase-audit/SKILL.md
+mkdir -p .claude/skills/large-codebase-audit/docs
+cp /path/to/repo/SKILL.md .claude/skills/large-codebase-audit/SKILL.md
+cp /path/to/repo/docs/CAVEATS.md .claude/skills/large-codebase-audit/docs/CAVEATS.md
 ```
 
-Useful if you want different audit behaviour per project.
+### Option C — Git submodule
 
-### Option C — Templates only (DIY)
+If you want to pull updates over time:
 
-Copy `templates/` into your project to get the hook scripts, nested-CLAUDE.md template, settings.json snippet, etc. — without the skill itself. Useful if you want to hand-apply Anthropic's methodology without the parallel-fork dispatch.
+```bash
+git submodule add git@github.com:MJWNA/large-codebase-audit-skill.git \
+  .claude/skills/large-codebase-audit
+git submodule update --init
+```
+
+> 🚫 The previous `templates/` install option is removed in v2.0.0. Templates were freezing project-specific shape and polluting the universal skill. The new SKILL.md describes good shape inline.
 
 ---
 
 ## 📄 Output
 
-After a successful run, the skill writes:
+Each cycle produces:
 
-```
-.claude/session/large-codebase-audit-YYYY-MM-DD.md
-```
-
-A comprehensive takeaways document containing:
-
-- Which of the 9 strategies were applied (and which were deferred)
-- Full file inventory (counts + paths)
-- Per-strategy surprises and mitigations
-- Recommended next actions (restart Claude Code, set env vars, etc.)
-- `_CONSOLIDATION_PROPOSALS.md` reference for any structural changes deferred to human review
-- Codex sync preview (if `~/.codex/skills/claude-rule-sync/` is installed)
-
-This document is **the input you feed back into the skill** for the next iteration — closing the self-improvement loop.
+- 📝 **Session log** at `.claude/session/large-codebase-audit-YYYY-MM-DD.md`
+  - Summary of changes per surface
+  - Open questions and deferred items
+  - Recommended DRI for ongoing Claude Code config management
+  - "Next review due" date (today + 90 days per article cadence)
+- 📋 **`_CONSOLIDATION_PROPOSALS.md`** in `.claude/` — rule merges and rule-to-skill conversions for human review (not auto-applied)
+- ✅ **Verification report** — file counts, JSON syntax, shell-script linting, frontmatter validation results
+- 🚨 **Critical actions list** — 3-7 items to address BEFORE the next session (e.g. restart Claude Code for MCP changes)
 
 ---
 
-## ⚠️ Real-world caveats (from trial)
+## ⚠️ Operational caveats
 
-This skill was **trialed end-to-end on a real codebase** before being published. The trial surfaced 15 caveats not covered in the Anthropic article — **read [docs/CAVEATS.md](docs/CAVEATS.md) before running**.
+The skill operates on real Claude Code behaviour, not idealised behaviour. Full caveats with citations and mitigations live in [`docs/CAVEATS.md`](docs/CAVEATS.md). Highlights:
 
-Highlights:
-
-- 🪤 **Path-scoped triggers fire on file READ, not Write/Create** (Claude Code issue [#23478](https://github.com/anthropics/claude-code/issues/23478)) — your nested CLAUDE.md won't load when Claude creates a brand-new file in that dir
-- 🪤 **`paths:` YAML-list form has known parser bugs** (issue [#17204](https://github.com/anthropics/claude-code/issues/17204)) — community-tested fallback: unquoted scalar form or undocumented `globs:` alias
-- 🪤 **Stop hooks cost tokens on every session-end** — set `CLAUDE_DISABLE_HEADLESS=1` to opt out during review periods
-- 🪤 **Sub-agent classifier may flag hook installs as "self-modification"** — pre-emptively note standing user authorisation in fork prompts
-- 🪤 **MCPs require a full Claude Code restart** (not `/clear`) to register
-
-Full list in [docs/CAVEATS.md](docs/CAVEATS.md).
+- 🔄 Path-scoped rules trigger on file READ, not Write/Create (issue #23478)
+- 🐛 Rules' `paths:` YAML-list form has parser quirks (issue #17204) — does NOT affect skills
+- 🧾 `description:` is undocumented for rules; for skills it IS the primary trigger field
+- 💸 Self-improving Stop hooks cost tokens every session-end — always provide an opt-out env var
+- 🔁 MCP changes require Claude Code restart, not `/clear`
+- 🍴 Forks cannot spawn further forks — this skill must run in the main thread
+- 🛑 Cross-fork write coordination requires disjoint scopes; one file → one fork
+- 🎭 Rules vs skills misclassification is the most common drift
+- 📦 Plugin layout per official spec — no `tooling/` directory exists
 
 ---
 
 ## 📐 Requirements
 
-| Requirement | Why |
-|---|---|
-| Claude Code v2.1.117+ | Forked sub-agents (`Agent` tool without `subagent_type`) |
-| `CLAUDE_CODE_FORK_SUBAGENT=1` in settings.json | Enable fork mode |
-| `gh` CLI (optional) | If you want the skill to inspect GitHub Issues/PRs as part of audit |
-| Node 18+ | For npm-installed LSP and MCP servers |
-| `jq` | Hook scripts validate `settings.json` syntax |
+- 🤖 Claude Code v2.1.117+ (for fork-mode support)
+- 🪂 `CLAUDE_CODE_FORK_SUBAGENT=1` in `~/.claude/settings.json` (skill falls back to named sub-agents otherwise, with cache-miss cost)
+- 🔄 Claude Code restart capability (for MCP changes to register)
+- 🐚 Standard Unix tools: `git`, `jq`, `bash`, `find`
+- 🔎 Optional: language-specific LSP binary (e.g. `typescript-language-server`) if Fix-7 will install LSP for your project
 
 ---
 
 ## 🤝 Contributing
 
-PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). The most valuable contributions are:
+PRs welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
 
-1. **New caveats** discovered while running this against your codebase — add to `docs/CAVEATS.md`
-2. **New AI-layer audit checks** the skill currently misses
-3. **Stack-specific skill templates** for languages/frameworks beyond Next.js (Rails, Django, FastAPI, Astro, SvelteKit, etc.)
+- Adding new audit surfaces (with citation to official docs)
+- Updating caveats (each must cite a source: official docs, issue tracker, or field experience)
+- Versioning policy (semver — breaking changes bump major, new surfaces bump minor)
+
+When opening an issue, include your Claude Code version (`claude --version`) and whether fork-mode is enabled.
 
 ---
 
 ## 🙏 Acknowledgements
 
-- **Anthropic** — for the [large codebase article](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start) that this skill operationalises
-- **Cole Medin** — for the [YouTube walkthrough](https://www.youtube.com/) and the helpline-AI-layer plugin pattern that informed the trial structure
-- The Claude Code team — for the forked-sub-agent harness that makes parallel orchestration cheap
+- Anthropic — for the [large-codebase article](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start) that sparked this skill
+- The Claude Code team — for the [official docs](https://code.claude.com/docs/en) that the v2 rewrite aligns against
+- Field reports from the Claude Code community — issue trackers #17204, #23478, and ongoing harness behaviour observations
 
 ---
 
 ## 📜 License
 
-[MIT](LICENSE) © 2026 Ronnie Meagher
-
----
-
-## Status
-
-🟠 **Beta** — Trialed once end-to-end on a real codebase. Caveats documented. Looking for issues from real-world use. File them [here](https://github.com/MJWNA/large-codebase-audit-skill/issues).
+[MIT](LICENSE) — use it, fork it, ship it.
