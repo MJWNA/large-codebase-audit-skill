@@ -2,6 +2,27 @@
 
 All notable changes to `large-codebase-audit-skill` are documented here. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] — 2026-05-22
+
+Patch release: catch a Stop-hook gotcha that doesn't surface until it bites you.
+
+### 🐛 Operational addition
+
+- 🗂️ **`/resume` picker pollution from `claude -p` in hooks.** New CAVEAT G14: any hook (Stop, SessionEnd, PostToolUse, etc.) that calls `claude -p` writes a fresh `sdk-cli` JSONL into the project's session folder every fire. The `/resume` picker filters these out but pages by mtime — once hook invocations outpace real interactive sessions, the picker renders empty. **Mitigation:** add `--no-session-persistence` to every hook-side `claude -p` invocation. One-line script change preserves the hook's behaviour completely.
+- 🪝 **Fork D audit gains a picker-pollution check.** The hooks-audit prompt now flags any `claude -p` or `claude --bare -p` in `.claude/settings.json` hooks lacking `--no-session-persistence`.
+
+### 🔧 Bumped
+
+- `docs/CAVEATS.md` operational-gotcha count: 13 → 14
+- README + SKILL.md caveats summary: new G14 highlight added
+- Version badge: v3.0.0 → v3.0.1
+
+### 🔗 Provenance
+
+Encountered in the wild on a real project running a self-improving Stop hook (the pattern Anthropic's article describes and community plugins like Cole Medin's helpline AI-layer implement): 77 ghost `sdk-cli` sessions accumulated in one day vs 45 real interactive sessions, and the `/resume` picker rendered empty. Neither the article nor the community plugin examples surface the picker side-effect — encoding it here so future audits catch it before the user notices.
+
+---
+
 ## [3.0.0] — 2026-05-22
 
 Comprehensive close-out of all 41 findings from the independent v2.0.0 audit. See [`AUDIT-v2.0.0-REVIEW.md`](AUDIT-v2.0.0-REVIEW.md) for the trace.

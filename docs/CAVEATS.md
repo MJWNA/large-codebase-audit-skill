@@ -181,6 +181,45 @@ Skills can execute shell via backtick-bang syntax (`` !`command` ``) inside SKIL
 
 ---
 
+## G14. 🗂️ Hook-invoked `claude -p` pollutes the `/resume` picker
+
+Any hook (Stop, SessionEnd, PostToolUse, etc.) that runs `claude -p ...` writes a fresh `sdk-cli` JSONL into the project's session folder (`~/.claude/projects/<proj>/`) **every time the hook fires**. The `/resume` picker filters out `sdk-cli` entries but pages by mtime — so when hook firings outpace real interactive sessions, the recent slots in the picker are all rejected ghost entries and the picker renders empty.
+
+**Symptom:** `/resume` shows no sessions in a project that has dozens of real interactive sessions on disk.
+
+**Mitigation:** add `--no-session-persistence` to every `claude -p` invocation inside a hook script:
+
+```bash
+claude -p --no-session-persistence --output-format text "$PROMPT"
+```
+
+The flag (only valid with `--print`) tells Claude Code to skip writing the subprocess's session JSONL to disk. The hook still runs normally, the prompt still completes, only the session-persistence side-effect is suppressed.
+
+**Real-world data:** a project running a self-improving Stop hook ([the pattern Anthropic's article describes](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start) and community plugins like Cole Medin's helpline implement) accumulated **77 `sdk-cli` ghosts vs 45 real interactive sessions** in one day on a dirty diff. The picker rendered empty until the ghosts were purged.
+
+**Audit task (Fork D):** for every hook command across `.claude/settings.json` (any event), grep for `claude -p` and `claude --bare -p`. Flag any occurrence that doesn't include `--no-session-persistence`. One-line script addition; preserves the hook's behaviour completely.
+
+**Cleanup recipe** if ghosts already accumulated:
+
+```bash
+# Classify by entrypoint and delete only sdk-cli files older than 5 min
+python3 -c "
+import json, os, glob, time
+proj = os.path.expanduser('~/.claude/projects/<cwd-encoded-project>')
+for f in glob.glob(f'{proj}/*.jsonl'):
+    if time.time() - os.path.getmtime(f) < 300: continue
+    with open(f) as fh:
+        for i, line in enumerate(fh):
+            if i > 30: break
+            try: d = json.loads(line)
+            except: continue
+            if d.get('entrypoint') == 'sdk-cli':
+                os.remove(f); break
+"
+```
+
+---
+
 ## 🔗 Sources
 
 - [Anthropic — How Claude Code works in large codebases](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start)
