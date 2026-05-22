@@ -1,10 +1,10 @@
 # Operational Caveats — `large-codebase-audit`
 
-Universal caveats that affect how an AI-layer audit plays out in practice. Sourced from the official [Claude Code docs](https://code.claude.com/docs/en), issue tracker, and field experience across real codebases. None of these are project-specific; if anything here turns out to be tied to one stack, move it out.
+Operational gotchas that affect how an AI-layer audit plays out in practice. Sourced from the official [Claude Code docs](https://code.claude.com/docs/en), issue tracker, and field experience across real codebases. **Gotchas only** — best practices (DRI, cadence, skill bundling, `InstructionsLoaded` use, LSP location) live in [`SKILL.md`](../SKILL.md) → *Best practices*.
 
 ---
 
-## 1. 🔄 Path-scoped rules trigger on file READ, not on Write/Create
+## G1. 🔄 Path-scoped rules trigger on file READ, not on Write/Create
 
 Per the official memory doc: *"Path-scoped rules trigger when Claude reads files matching the pattern, not on every tool use."*
 
@@ -17,7 +17,7 @@ Per the official memory doc: *"Path-scoped rules trigger when Claude reads files
 
 ---
 
-## 2. 🐛 Rules' `paths:` YAML-list form has known parser quirks
+## G2. 🐛 Rules' `paths:` YAML-list form has known parser quirks
 
 Issue #17204 documents that the YAML-list form of `paths:` in rules can fail silently or misparse glob patterns starting with `*` or `{`.
 
@@ -30,7 +30,7 @@ Issue #17204 documents that the YAML-list form of `paths:` in rules can fail sil
 
 ---
 
-## 3. 🧾 `description:` field — different role on rules vs skills
+## G3. 🧾 `description:` field — different role on rules vs skills
 
 | Surface | Is `description:` documented? | Loader effect |
 |---|---|---|
@@ -43,9 +43,13 @@ Issue #17204 documents that the YAML-list form of `paths:` in rules can fail sil
 
 ---
 
-## 4. 💸 Self-improving Stop hooks cost tokens every session-end
+## G4. 💸 "Self-improving Stop hook" is a community pattern, not docs canon
 
-If you wire a Stop hook that introspects the conversation and updates rules / skills / CLAUDE.md, it runs once per session termination. Even a minimal hook is a non-zero token cost across many sessions.
+The phrase "self-improving Stop hook" is widely used in field reports for a Stop hook that introspects the conversation and updates rules / skills / CLAUDE.md. **It is not documented in `/en/hooks` as an Anthropic-blessed pattern.** The `Stop` event exists; no self-refinement template ships with it.
+
+**Implications:**
+- Don't cite "self-improving Stop hook" as if it were docs terminology — frame it as a community pattern.
+- The pattern is real and useful, but its cost (tokens at every session-end) and reliability (hooks fail silently) are *not* docs-managed.
 
 **Mitigations:**
 - Always provide an opt-out env var (e.g. `CLAUDE_DISABLE_HEADLESS=1`)
@@ -54,15 +58,15 @@ If you wire a Stop hook that introspects the conversation and updates rules / sk
 
 ---
 
-## 5. 🔁 MCP server changes require Claude Code restart, not `/clear`
+## G5. 🔁 MCP server changes require Claude Code restart, not `/clear`
 
 `/clear` resets the conversation but does not re-register MCP servers. New entries in `.mcp.json` (or new MCP entries in `.claude/settings.json`) are picked up only on a full Claude Code restart.
 
-**Implication for audits:** if Phase 3 adds or modifies MCP entries, the Phase 4 wrap-up MUST surface a restart instruction to the user as a top-priority action.
+**Implication for audits:** if Phase 3 adds or modifies MCP entries, the Phase 4 wrap MUST surface a restart instruction to the user as a top-priority action.
 
 ---
 
-## 6. 🍴 Forks cannot spawn further forks
+## G6. 🍴 Forks cannot spawn further forks
 
 Per the official subagents doc: *"A fork cannot spawn further forks."*
 
@@ -72,18 +76,18 @@ Per the official subagents doc: *"A fork cannot spawn further forks."*
 
 ---
 
-## 7. 🛑 Cross-fork write coordination requires disjoint scopes
+## G7. 🛑 Cross-fork write coordination requires disjoint scopes
 
 When Phase 3 dispatches parallel write forks, two forks writing to the same file cause one to lose. The fork-dispatch checklist (one file → one fork) is load-bearing, not advisory.
 
 **Mitigations:**
 - Each fork's prompt states its EXCLUSIVE write scope at the top
 - Each fork's prompt names the *other* forks running in parallel so it stays in lane
-- Defer rule consolidations and rule-to-skill conversions to a `_CONSOLIDATION_PROPOSALS.md` doc for human review
+- Defer rule consolidations and rule-to-skill conversions to a `_CONSOLIDATION_PROPOSALS.md` doc for human review. The next cycle's Phase 0 drains the file as its first action.
 
 ---
 
-## 8. 🎭 Rules vs skills misclassification is the most common drift
+## G8. 🎭 Rules vs skills misclassification is the most common drift
 
 The simplest mental model:
 
@@ -96,7 +100,7 @@ If a skill is just one paragraph saying "use library X for Y", it's a rule in di
 
 ---
 
-## 9. 📦 Plugin directory layout
+## G9. 📦 Plugin directory layout
 
 Per the official plugins doc, the canonical plugin layout is:
 
@@ -104,46 +108,62 @@ Per the official plugins doc, the canonical plugin layout is:
 my-plugin/
   .claude-plugin/
     plugin.json        # required manifest
+    marketplace.json   # optional, for distribution
   skills/
-  commands/
+  commands/            # legacy; new plugins prefer skills/
   agents/
   hooks/
   monitors/
-  bin/
+  bin/                 # added to PATH while plugin enabled
   .mcp.json
   .lsp.json
-  settings.json
+  settings.json        # honors only `agent` and `subagentStatusLine`
 ```
 
 There is **no `tooling/` directory** in the official spec. Earlier informal references to `tooling/` were incorrect.
 
----
-
-## 10. 🧠 Auto-memory is part of the AI layer
-
-`~/.claude/projects/<project-path>/memory/` carries per-project facts across sessions. The official auto-memory subsystem maintains it, but it benefits from periodic pruning:
-
-- Stale entries (>90 days, not referenced in recent sessions) bloat session-start context
-- `MEMORY.md` is the index file — keep it under ~200 lines (truncation cutoff)
-- Audits should look here, not just at `.claude/`
+A plugin can declare `mcpServers` inline in `plugin.json` instead of a separate `.mcp.json`.
 
 ---
 
-## 11. 📏 Skill-budget knobs in settings.json
+## G10. 🧠 Auto-memory: `MEMORY.md` is 200 lines OR 25KB; topic files load on demand
+
+Two facts that shape pruning advice:
+
+1. **`MEMORY.md` cutoff:** the loader reads the first 200 lines OR 25KB, **whichever comes first**. Past either limit, content is silently truncated.
+2. **Topic files load on demand**, not at session start. They pay zero session-start tokens. Pruning a topic file does not reduce startup cost — only relevance noise (and the chance of irrelevant content being pulled in mid-session).
+
+**Implication for audits:**
+- Items eating session-start cost live in `MEMORY.md`. To free startup tokens, move content from `MEMORY.md` into topic files (not the other way round).
+- Items eating mid-session relevance live in topic files. Pruning these helps avoid the LLM pulling in stale or wrong context.
+
+**Memory types caveat:** the user-convention of typing memories as `user` / `feedback` / `project` / `reference` is a popular community structuring pattern, **not part of the auto-memory subsystem schema**. The loader doesn't read the `type:` frontmatter as anything other than metadata. Audit by recency and by `MEMORY.md` presence, not by type — unless the project explicitly uses the typed convention.
+
+Other auto-memory facts the audit should know:
+
+- Storage path is keyed by git repo, so worktrees share memory across the same project
+- `autoMemoryEnabled` setting + `CLAUDE_CODE_DISABLE_AUTO_MEMORY` env can silently disable the subsystem at managed / user level
+- `autoMemoryDirectory` is managed-only or user-only (never project — prevents repo redirection attacks)
+- Sub-agents can maintain their own auto-memory at `~/.claude/projects/<proj>/agents/<agent>/memory/`
+- Minimum Claude Code version for auto-memory: v2.1.59+
+
+---
+
+## G11. 📏 Skill-budget knobs — defaults and effect
 
 The official skill-listing budget controls:
 
-| Setting | Effect |
-|---|---|
-| `skillListingBudgetFraction` | Fraction of context budget reserved for skill listings (default ~0.10) |
-| `maxSkillDescriptionChars` | Truncates each skill's description in the listing |
-| `skillOverrides` | Per-skill enable/disable map |
+| Setting | Default | Effect |
+|---|---|---|
+| `skillListingBudgetFraction` | **`0.01`** (1%) | Fraction of context budget reserved for skill listings. Lower for skill-heavy projects to free context. |
+| `maxSkillDescriptionChars` | `1536` | Truncates each skill's `description` + `when_to_use` (combined) in the listing |
+| `skillOverrides` | unset | Per-skill state: `on` / `name-only` / `user-invocable-only` / `off` |
 
-For an "AI layer audit" these are first-class targets: if the project has 47 skills, lowering `skillListingBudgetFraction` to 0.05 may free meaningful context without losing functionality (the truncated skills still load on full match).
+For an "AI layer audit" these are first-class targets: if the project has 47 skills, lowering `skillListingBudgetFraction` from `0.01` to `0.005` may free meaningful context without losing functionality — truncated skills still load on full description match. Going the other direction (`0.02`+) trades startup context for fewer auto-load misses; defensible for skill-light projects where the budget is dominated by something else.
 
 ---
 
-## 12. ✂️ `claudeMdExcludes` is the monorepo CLAUDE.md trim knob
+## G12. ✂️ `claudeMdExcludes` is the monorepo CLAUDE.md trim knob
 
 In monorepos, nested CLAUDE.md proliferation can over-load the root context. The official `claudeMdExcludes` setting (a glob list in `.claude/settings.json`) suppresses specific nested files from auto-loading.
 
@@ -151,52 +171,18 @@ In monorepos, nested CLAUDE.md proliferation can over-load the root context. The
 
 ---
 
-## 13. 🔐 `disableSkillShellExecution` for security
+## G13. 🔐 `disableSkillShellExecution` — security knob for skills, not MCP
 
-Skills can execute shell via backtick-bang syntax (`` !`command` ``). The `disableSkillShellExecution` setting blocks this entirely.
+Skills can execute shell via backtick-bang syntax (`` !`command` ``) inside SKILL.md content. The `disableSkillShellExecution` setting blocks this entirely. **This controls skills, not MCP servers** — a common misconception (v2 of this skill placed it under MCP audit, which was wrong).
 
 **When to recommend setting it:** projects that install third-party skills from a marketplace, or projects with security-sensitive build environments. Default is unset (shell allowed).
 
----
-
-## 14. 🧰 `InstructionsLoaded` hook is the canonical "what loaded?" diagnostic
-
-Instead of manually reading every CLAUDE.md and rule file to figure out what's actually in context, the `InstructionsLoaded` hook reports it directly. Use this as Fork-A's first command in Phase 1.
-
----
-
-## 15. 🔍 LSP config lives in `.lsp.json`
-
-The official LSP configuration file is `.lsp.json` at the project root (or inside a plugin). Symbol-server installation is separate (e.g. `typescript-language-server` via npm). Both must be present for LSP to function.
-
----
-
-## 16. 🏢 Multi-person orgs need a Claude Code DRI
-
-The Anthropic article dedicates a section to assigning ownership. Without a named DRI, configuration drifts: nobody updates CLAUDE.md when patterns change, nobody schedules the 3-6 month review cadence, nobody resolves contradictions when two contributors add competing rules.
-
-**Audit task:** if the project is in a multi-person org and the audit finds no DRI signal (no `.claude/OWNERS`, no `CODEOWNERS` entry covering `.claude/`, no CLAUDE.md "Maintainer" line), recommend assigning one in the Phase 4 wrap.
-
----
-
-## 17. 🗓️ 3-6 month review cadence
-
-The Anthropic article quotes: *"Teams should expect to do a meaningful configuration review every three to six months."*
-
-**Audit task:** the Phase 4 wrap MUST include a "Next review due" date (today + 90 days as a sensible default). Without it the audit is a one-shot, not a cadence.
-
----
-
-## 18. 📦 Skill bundling — keep supporting files INSIDE the skill directory
-
-If a skill needs supporting docs, schemas, or scripts, they live inside the skill's own directory (`skills/<name>/docs/`, `skills/<name>/references/`, etc.) — never scattered elsewhere. Skills must be portable across machines, repos, and Claude / Codex / Copilot loaders.
-
-The exception is templates that would freeze project-specific shape — those *should not exist* in a universal skill, because they pollute the universal use case.
+**Note on skill content lifecycle:** when context is compacted, skills loaded via `!`command`` may need to re-execute to refresh their dynamic content. Skill-heavy projects should be aware of the re-attach cost after compaction.
 
 ---
 
 ## 🔗 Sources
 
 - [Anthropic — How Claude Code works in large codebases](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start)
-- [Official Claude Code docs](https://code.claude.com/docs/en) — skills, sub-agents, memory, hooks, MCP, plugins
+- [Official Claude Code docs](https://code.claude.com/docs/en) — skills, sub-agents, memory, hooks, MCP, plugins, settings, permissions, sandboxing, worktrees, output-styles, auto-mode, [plugins-reference (LSP)](https://code.claude.com/docs/en/plugins-reference#lsp-servers)
 - Issues referenced: #17204 (rules paths parser), #23478 (path-scoped read trigger)

@@ -2,16 +2,16 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Skill-D97757?logo=anthropic&logoColor=white)](https://code.claude.com/docs/en)
-[![Version](https://img.shields.io/badge/Version-v2.0.0-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-v3.0.0-blue)](CHANGELOG.md)
 [![GitHub stars](https://img.shields.io/github/stars/MJWNA/large-codebase-audit-skill?style=flat)](https://github.com/MJWNA/large-codebase-audit-skill/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/MJWNA/large-codebase-audit-skill)](https://github.com/MJWNA/large-codebase-audit-skill/issues)
 [![Last commit](https://img.shields.io/github/last-commit/MJWNA/large-codebase-audit-skill)](https://github.com/MJWNA/large-codebase-audit-skill/commits/main)
 
 > **A Claude Code skill that audits and improves a project's entire AI layer in one cycle, using parallel forked sub-agents. Aligned with the [Anthropic article](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start) and cross-referenced against the [official Claude Code docs](https://code.claude.com/docs/en).**
 
-The Anthropic article's central thesis is that **the harness matters as much as the model**. This skill audits the harness as a whole — across 9 official surfaces — then applies fixes in the order the article recommends (CLAUDE.md first), with disjoint write scopes so parallel forks never collide.
+The Anthropic article's central thesis is that **the harness matters as much as the model**. This skill audits the harness as a whole — across the AI-layer surfaces the article + docs describe — then applies fixes in the order the article recommends (CLAUDE.md first), with disjoint write scopes so parallel forks never collide.
 
-> 🆕 **Version 2.0.0** brings the skill into alignment with the official docs. See [CHANGELOG.md](CHANGELOG.md) for breaking changes (templates removed, surfaces expanded from 7 to 9, factual corrections).
+> 🆕 **Version 3.0.0** closes all 41 findings from the independent v2 audit. See [CHANGELOG.md](CHANGELOG.md) and [AUDIT-v2.0.0-REVIEW.md](AUDIT-v2.0.0-REVIEW.md) for the trace. Breaking changes: dropped the fixed "9 official surfaces" framing, adaptive Phase 3 dispatch, inline Phase 4, CAVEATS restructured.
 
 ---
 
@@ -52,84 +52,93 @@ This skill walks all 9 surfaces in **one parallel-forked cycle**, applies fixes 
 
 ## 🔍 What it audits
 
-The 9 official AI-layer surfaces, synthesised from Anthropic's article and the [official docs](https://code.claude.com/docs/en):
+The AI-layer surfaces synthesised from Anthropic's article and the [official docs](https://code.claude.com/docs/en). Each surface is tagged `[article]` if the article explicitly discusses it, `[docs]` if it's docs-only:
 
-| # | Surface | Where it lives | Key audit question |
-|---|---|---|---|
-| 1 | 📜 CLAUDE.md hierarchy | Root + nested `CLAUDE.md` | Root under 80 lines, pointers-only? Nested files at meaningful sub-tree boundaries? |
-| 2 | 📋 Rules | `.claude/rules/*.md` | Anything always-loaded that could be path-scoped? Rules that are skills in disguise? |
-| 3 | 🎯 Skills | `.claude/skills/*/SKILL.md` | Path-scoped triggers correct? Supporting files bundled inside the skill dir? |
-| 4 | 🤖 Sub-agents | `.claude/agents/*.md` | Read-only explorer agent? DB / log inspectors? |
-| 5 | 🪝 Hooks | `.claude/settings.json` → `hooks` | Self-improving Stop hook? `InstructionsLoaded` for diagnostics? PreToolUse guardrails? |
-| 6 | 🔌 MCP servers | `.mcp.json` | Project-scope MCPs registered? `disableSkillShellExecution` where needed? |
-| 7 | 🔎 LSP | `.lsp.json` | Symbol-server configured for the dominant language? Binary installed? |
-| 8 | 📦 Plugins | `.claude-plugin/plugin.json` | Is the project itself a plugin? Bundled skills marketplace-ready? |
-| 9 | 🧠 Auto-memory | `~/.claude/projects/<proj>/memory/` | Benefitting from auto-memory? Stale entries (>90 days)? |
+| # | Surface | Source | Where it lives | Key audit question |
+|---|---|---|---|---|
+| 1 | 📜 CLAUDE.md hierarchy | [article] | Root + nested `CLAUDE.md` | Root concise, pointers-only? Nested at sub-tree boundaries? Legacy rules a current model wouldn't need? |
+| 2 | 🗺️ Codebase navigability | [article] | `.claudeignore`, codebase maps, monorepo invocation, scoped test/lint | Is Claude invoked at sub-tree roots in monorepos? Do nested files scope test/lint? |
+| 3 | 📋 Rules | [docs] | `.claude/rules/*.md` | Always-loaded that could be path-scoped? Rules that are skills in disguise? |
+| 4 | 🎯 Skills + slash commands | [article] + [docs] | `.claude/skills/*/SKILL.md`, `.claude/commands/*.md` | Per-frontmatter audit; orphan supporting files; `.claude/commands/` migration; bundled `/run` `/verify` recipe captured? |
+| 5 | 🤖 Sub-agents | [article] | `.claude/agents/*.md` | Field-by-field — `tools`, `permissionMode`, `model`, `memory`, `mcpServers`, `isolation: worktree` candidates |
+| 6 | 🪝 Hooks | [article] | `.claude/settings.json` → `hooks` | Which of 31 events used? Handler types beyond `command`? Continuous improvement, not just safety? |
+| 7 | ⚙️ Settings + permissions + sandbox + worktree | [docs] | `.claude/settings.json`, `.local.json`, managed | `defaultMode`? Sandbox where untrusted code runs? Worktree config? `settings.local.json` gitignored? |
+| 8 | 🔌 MCP | [article] | `.mcp.json` + `~/.claude.json` local scope | `ENABLE_TOOL_SEARCH` / `alwaysLoad` posture for multi-server projects? `MAX_MCP_OUTPUT_TOKENS`? |
+| 9 | 🔎 LSP | [article] | Pre-built plugin or `.lsp.json` fallback | Pre-built plugin for dominant language? Binary present? |
+| 10 | 📦 Plugins | [article] | `.claude-plugin/` | If plugin: `plugin.json` complete? Marketplace-ready? `monitors/` schema? |
+| 11 | 🧠 Auto-memory | [docs] | `~/.claude/projects/<proj>/memory/` | `MEMORY.md` 200-lines-or-25KB cutoff? Topic-file curation? |
 
-Plus the settings.json budget knobs that affect all of the above: `skillListingBudgetFraction`, `maxSkillDescriptionChars`, `skillOverrides`, `claudeMdExcludes`.
+Plus the settings.json budget knobs (`skillListingBudgetFraction` default **`0.01`**, `maxSkillDescriptionChars`, `skillOverrides`, `claudeMdExcludes`) which affect all of the above.
 
 ---
 
 ## 🔧 What it fixes
 
-Fixes are dispatched in **the article's stated order** (the article is explicit: *"CLAUDE.md files come first"*):
+Fixes are dispatched in **the article's H3 order** (article §2 H3: *"CLAUDE.md files come first"* etc.), with docs-only surfaces appended:
 
 1. 📜 Root `CLAUDE.md` — trim, restructure, add pointers
-2. 📜 Nested `CLAUDE.md` — create at meaningful sub-tree boundaries
-3. 🪝 Hooks + settings.json — add self-improving Stop, `InstructionsLoaded`, safety guardrails, tune skill-budget knobs
-4. 🎯 Skills — create path-scoped skills for recurring task shapes, fix frontmatter
-5. 🤖 Sub-agents — explorer and inspector agents
-6. 📦 Plugins — if the project is a plugin, validate the manifest
-7. 🔎 LSP — install binary, write `.lsp.json`
-8. 🔌 MCP — register project-scope servers in `.mcp.json` (requires Claude Code restart)
-9. 🧠 Auto-memory — prune stale entries, surface gaps
+2. 📜 Nested `CLAUDE.md` + codebase navigability — `.claudeignore`, scoped test/lint
+3. 🪝 Hooks + settings + permissions + sandbox — add `InstructionsLoaded`, `UserPromptSubmit` shaping, `PreCompact` automation, sandbox where appropriate, permissions block
+4. 🎯 Skills + slash-commands migration — create path-scoped skills, fix frontmatter, migrate `.claude/commands/*.md`
+5. 🤖 Sub-agents — explorer / inspector agents, field-by-field edits to existing
+6. 📦 Plugins — if the project is a plugin, validate manifest + marketplace
+7. 🔎 LSP — install pre-built plugin or write `.lsp.json`
+8. 🔌 MCP — register project-scope servers, set tool-search posture (requires Claude Code restart)
+9. 🧠 Auto-memory — move startup-cost items from `MEMORY.md` to topic files, prune stale entries
+10. 📋 Rules — path-scoping + deletion-test trims (consolidations deferred to `_CONSOLIDATION_PROPOSALS.md` for human review; next cycle's Phase 0 drains the file)
 
-Each fix runs in its own forked sub-agent with an **exclusive write scope** — two forks never touch the same file. Rule consolidations and rule-to-skill conversions are *deferred* to a `_CONSOLIDATION_PROPOSALS.md` doc for human review (consolidations break pointers other forks rely on inside the same cycle).
+Each fix runs in its own forked sub-agent with an **exclusive write scope** — two forks never touch the same file. **Adaptive dispatch:** fix forks for surfaces with zero Phase 1 findings are skipped, not dispatched as no-ops. Rule consolidations and rule-to-skill conversions are *deferred* to a `_CONSOLIDATION_PROPOSALS.md` doc for human review (consolidations break pointers other forks rely on inside the same cycle).
 
 ---
 
 ## ⚙️ How it works
 
 ```
-Phase 0 — Pre-flight                  (sequential, ~1-2 min)
-   ├─ Verify git repo root
-   ├─ Verify fork-mode (CLAUDE_CODE_FORK_SUBAGENT=1) or fall back
-   ├─ Read root CLAUDE.md, ARCHITECTURE.md, .claude/settings.json
+Phase 0 — Pre-flight                  (sequential, ~2-3 min)
+   ├─ Verify git repo root + fork-mode (CLAUDE_CODE_FORK_SUBAGENT=1)
+   ├─ Drain _CONSOLIDATION_PROPOSALS.md from prior cycle (if any)
+   ├─ Scaffold .claude/ if absent (stub settings.json)
+   ├─ Read CLAUDE.md, settings.json, settings.local.json (check gitignore)
    ├─ Capture InstructionsLoaded diagnostic (if available)
+   ├─ Check bundled /run, /verify, /run-skill-generator recipes
+   ├─ Monorepo check — multiple package.json / Cargo.toml / go.mod at sub-tree roots?
    └─ Identify dominant tech stack
 
 Phase 1 — Audit                       (7 parallel forks, single message)
-   ├─ Fork A: CLAUDE.md hierarchy     │
-   ├─ Fork B: Rules                   │
-   ├─ Fork C: Skills + agents + cmds  │  All read-only.
-   ├─ Fork D: Hooks + settings        │  Each returns a punch list
-   ├─ Fork E: MCP + LSP + plugins     │  under 800 words.
-   ├─ Fork F: Codebase structure      │
-   └─ Fork G: Auto-memory             │
+   ├─ Fork A: CLAUDE.md hierarchy + navigability  │
+   ├─ Fork B: Rules                               │
+   ├─ Fork C: Skills + sub-agents + commands      │  All read-only.
+   ├─ Fork D: Hooks (31 events × 5 handler types) │  Each returns a
+   ├─ Fork E: Settings/permissions/sandbox/worktree│ punch list under
+   ├─ Fork F: MCP + LSP + plugins                 │  800 words.
+   └─ Fork G: Auto-memory                         │
 
 Phase 2 — Synthesise + order          (sequential, ~3-5 min)
    ├─ Merge punch lists
    ├─ Map every fix to one fork, one write scope
-   ├─ Order per article hierarchy (CLAUDE.md first)
+   ├─ Order per article H3 hierarchy + docs-only tail
+   ├─ Adaptive: skip fix forks with no Phase 1 findings
    └─ Confirm with user unless --yes / standing authorisation
 
-Phase 3 — Fix                         (parallel forks, single message)
+Phase 3 — Fix                         (adaptive parallel forks, single message)
    ├─ Fix-1 → root CLAUDE.md          │  Each fork:
-   ├─ Fix-2 → nested CLAUDE.md        │   • States exclusive write scope
-   ├─ Fix-3 → hooks + settings        │   • Knows other forks' scopes
-   ├─ Fix-4 → skills                  │   • Self-validates (jq, bash -n)
-   ├─ Fix-5 → sub-agents              │   • Reports back: files,
-   ├─ Fix-6 → plugins                 │     line counts, surprises
-   ├─ Fix-7 → LSP                     │
+   ├─ Fix-2 → nested CLAUDE.md + nav  │   • States exclusive write scope
+   ├─ Fix-3 → hooks/settings/sandbox  │   • Knows other forks' scopes
+   ├─ Fix-4 → skills + commands mig.  │   • Self-validates (jq, bash -n,
+   ├─ Fix-5 → sub-agents              │     wc -l, yaml parse)
+   ├─ Fix-6 → plugins                 │   • Reports back: files,
+   ├─ Fix-7 → LSP                     │     line counts, surprises
    ├─ Fix-8 → MCP                     │
-   ├─ Fix-9 → auto-memory prune       │
-   └─ Fix-10 → rules (safe trims only)│
+   ├─ Fix-9 → auto-memory             │
+   └─ Fix-10 → rules (safe trims)     │
 
-Phase 4 — Wrap + cadence              (sequential)
+Phase 4 — Wrap + cadence              (sequential, INLINE — not a fork)
    ├─ Verification commands
    ├─ Write .claude/session/large-codebase-audit-YYYY-MM-DD.md
-   ├─ Recommend DRI if multi-person org
-   ├─ Set "Next review due" date (today + 90 days)
+   ├─ Recommend DRI or agent-manager (multi-person org)
+   ├─ Frame the "why" — tribal-knowledge / adoption plateau (article)
+   ├─ Set "Next review due" (today + 90 days) + note latest model release
+   ├─ Write .claude/session/REVIEW_DUE.md for Stop-hook surfacing
    └─ Surface critical "before next session" actions
 ```
 
@@ -216,17 +225,20 @@ Each cycle produces:
 
 ## ⚠️ Operational caveats
 
-The skill operates on real Claude Code behaviour, not idealised behaviour. Full caveats with citations and mitigations live in [`docs/CAVEATS.md`](docs/CAVEATS.md). Highlights:
+The skill operates on real Claude Code behaviour, not idealised behaviour. Full caveats with citations and mitigations live in [`docs/CAVEATS.md`](docs/CAVEATS.md) (13 operational gotchas). Best-practices items (DRI, cadence, skill bundling, `InstructionsLoaded` use, LSP location) live in [`SKILL.md`](SKILL.md) → *Best practices*. Highlights:
 
 - 🔄 Path-scoped rules trigger on file READ, not Write/Create (issue #23478)
 - 🐛 Rules' `paths:` YAML-list form has parser quirks (issue #17204) — does NOT affect skills
 - 🧾 `description:` is undocumented for rules; for skills it IS the primary trigger field
-- 💸 Self-improving Stop hooks cost tokens every session-end — always provide an opt-out env var
+- 💸 "Self-improving Stop hook" is a community pattern (not docs canon); always provide an opt-out env var
 - 🔁 MCP changes require Claude Code restart, not `/clear`
 - 🍴 Forks cannot spawn further forks — this skill must run in the main thread
 - 🛑 Cross-fork write coordination requires disjoint scopes; one file → one fork
 - 🎭 Rules vs skills misclassification is the most common drift
-- 📦 Plugin layout per official spec — no `tooling/` directory exists
+- 📦 Plugin layout per official spec — there is no `tooling/` directory
+- 🔐 `disableSkillShellExecution` is a skills control, not MCP
+- 🧠 `MEMORY.md` cutoff is 200 lines OR 25KB; topic files load on demand
+- 📏 `skillListingBudgetFraction` default is **`0.01`** (1%), not 10%
 
 ---
 
@@ -257,6 +269,7 @@ When opening an issue, include your Claude Code version (`claude --version`) and
 - Anthropic — for the [large-codebase article](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start) that sparked this skill
 - The Claude Code team — for the [official docs](https://code.claude.com/docs/en) that the v2 rewrite aligns against
 - Field reports from the Claude Code community — issue trackers #17204, #23478, and ongoing harness behaviour observations
+- The independent v2.0.0 audit that drove the v3.0.0 rewrite — captured in [`AUDIT-v2.0.0-REVIEW.md`](AUDIT-v2.0.0-REVIEW.md)
 
 ---
 
