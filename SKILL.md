@@ -40,7 +40,7 @@ Each surface is tagged by source: `[article]` if the Anthropic article explicitl
 
 Two cross-cutting settings.json knobs sit alongside these surfaces:
 
-- `skillListingBudgetFraction` (default `0.01`), `maxSkillDescriptionChars` (default 1536), `skillOverrides` (`on` / `name-only` / `user-invocable-only` / `off`) — skill-budget controls
+- `skillListingBudgetFraction` (default `0.01`), `maxSkillDescriptionChars` (default 1536), `skillOverrides` — skill-budget controls. **`skillOverrides` is a per-skill record** (`Record<skillName, "on" \| "name-only" \| "user-invocable-only" \| "off">`), not a top-level string. Setting it as a string crashes settings.json validation — see CAVEAT G15.
 - `claudeMdExcludes` — monorepo CLAUDE.md trim knob
 
 ## 🔄 Workflow
@@ -80,7 +80,7 @@ Dispatch all forks in a single `Agent`-tool message. Forks (no `subagent_type`) 
 
 #### Fork E — Settings + permissions + sandbox + worktree
 
-> Audit `.claude/settings.json`, `.claude/settings.local.json`, and (if discoverable) `managed-settings.json` for: **Settings layering** — managed > CLI > local > project > user precedence understood; conflicts surfaced. **`settings.local.json` gitignore status** — if not gitignored, flag immediately (common foot-gun: secrets get committed). **Permissions block** — `allow` / `ask` / `deny` / `defaultMode` (default / acceptEdits / plan / auto / dontAsk / bypassPermissions — which posture matches project intent?) / `additionalDirectories`. Read/Edit rule path anchors (`//absolute`, `~/home`, `/project-root`, `./cwd`). Bash wildcard + process-wrapper stripping semantics. `Agent(Name)` rules to disable specific subagents. MCP permission patterns (`mcp__server`, `mcp__server__*`, `mcp__server__tool`). `WebFetch(domain:...)` rules. **Sandbox subsystem** — `sandbox.enabled`, `filesystem.denyRead/Write`, `network.allowedDomains/deniedDomains`, `bwrapPath` on Linux, weaker mode for macOS — the largest security knob the v2 skill ignored. **Worktree config** — `worktree.baseRef/symlinkDirectories/sparsePaths/bgIsolation` — directly relevant to fork isolation in large codebases. **autoMode classifier rules** (`allow` / `soft_deny` / `hard_deny` / `environment`). **Skill-budget knobs** — `skillListingBudgetFraction` (default `0.01`; lowering to `0.005` for skill-heavy projects can free meaningful context), `maxSkillDescriptionChars` (default 1536), `skillOverrides`. **`claudeMdExcludes`** opportunities. **`disableSkillShellExecution`** — for projects installing third-party skills from a marketplace or in security-sensitive build environments. **`outputStyle`** (does the project pin one?). **Plan-mode `plansDirectory` / `useAutoModeDuringPlan`** — where do plan files land? gitignored? Report a punch list under 800 words. Read-only.
+> Audit `.claude/settings.json`, `.claude/settings.local.json`, and (if discoverable) `managed-settings.json` for: **Settings layering** — managed > CLI > local > project > user precedence understood; conflicts surfaced. **`settings.local.json` gitignore status** — if not gitignored, flag immediately (common foot-gun: secrets get committed). **Permissions block** — `allow` / `ask` / `deny` / `defaultMode` (default / acceptEdits / plan / auto / dontAsk / bypassPermissions — which posture matches project intent?) / `additionalDirectories`. Read/Edit rule path anchors (`//absolute`, `~/home`, `/project-root`, `./cwd`). Bash wildcard + process-wrapper stripping semantics. `Agent(Name)` rules to disable specific subagents. MCP permission patterns (`mcp__server`, `mcp__server__*`, `mcp__server__tool`). `WebFetch(domain:...)` rules. **Sandbox subsystem** — `sandbox.enabled`, `filesystem.denyRead/Write`, `network.allowedDomains/deniedDomains`, `bwrapPath` on Linux, weaker mode for macOS — the largest security knob the v2 skill ignored. **Worktree config** — `worktree.baseRef/symlinkDirectories/sparsePaths/bgIsolation` — directly relevant to fork isolation in large codebases. **autoMode classifier rules** (`allow` / `soft_deny` / `hard_deny` / `environment`). **Skill-budget knobs** — `skillListingBudgetFraction` (default `0.01`; lowering to `0.005` for skill-heavy projects can free meaningful context), `maxSkillDescriptionChars` (default 1536), `skillOverrides` (**per-skill record**, NOT a top-level string — Claude Code rejects the whole settings file otherwise; see CAVEAT G15). For any existing `skillOverrides` entry, verify it's `{}` or `{ "name": "off" / "name-only" / "user-invocable-only" / "on" }`. **`claudeMdExcludes`** opportunities. **`disableSkillShellExecution`** — for projects installing third-party skills from a marketplace or in security-sensitive build environments. **`outputStyle`** (does the project pin one?). **Plan-mode `plansDirectory` / `useAutoModeDuringPlan`** — where do plan files land? gitignored? Report a punch list under 800 words. Read-only.
 
 #### Fork F — MCP + LSP + plugins
 
@@ -224,6 +224,7 @@ Full versions with citations and mitigations live in [`docs/CAVEATS.md`](docs/CA
 - 📜 Block-level HTML comments are stripped from CLAUDE.md by the loader — don't use them for structure
 - 🧠 `MEMORY.md` is first 200 lines OR 25KB (whichever first); topic files load on demand
 - 🗂️ Hook-invoked `claude -p` pollutes `/resume` picker — add `--no-session-persistence` to suppress (CAVEAT G14)
+- 🚫 `skillOverrides` is a per-skill **record**, NOT a top-level string — wrong type crashes settings.json validation (CAVEAT G15)
 
 ## ✅ Fork-dispatch checklist (run mentally before EVERY parallel batch)
 
@@ -239,5 +240,5 @@ Full versions with citations and mitigations live in [`docs/CAVEATS.md`](docs/CA
 
 - 📰 [Anthropic article — How Claude Code works in large codebases](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start)
 - 📖 [Official Claude Code docs](https://code.claude.com/docs/en) — skills, sub-agents, memory, hooks, MCP, plugins, settings, permissions, sandboxing, worktrees, output-styles, auto-mode, plugins-reference (LSP)
-- 🚨 [`docs/CAVEATS.md`](docs/CAVEATS.md) — 14 operational gotchas with citations and mitigations
+- 🚨 [`docs/CAVEATS.md`](docs/CAVEATS.md) — 15 operational gotchas with citations and mitigations
 - 🔍 [`AUDIT-v2.0.0-REVIEW.md`](AUDIT-v2.0.0-REVIEW.md) — the audit that drove this v3.0.0

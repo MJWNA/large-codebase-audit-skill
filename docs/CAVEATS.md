@@ -157,7 +157,7 @@ The official skill-listing budget controls:
 |---|---|---|
 | `skillListingBudgetFraction` | **`0.01`** (1%) | Fraction of context budget reserved for skill listings. Lower for skill-heavy projects to free context. |
 | `maxSkillDescriptionChars` | `1536` | Truncates each skill's `description` + `when_to_use` (combined) in the listing |
-| `skillOverrides` | unset | Per-skill state: `on` / `name-only` / `user-invocable-only` / `off` |
+| `skillOverrides` | unset (treated as `{}`) | **Per-skill record** (`{ "skill-name": "off" / "name-only" / "user-invocable-only" / "on" }`). NOT a top-level string — see G15. |
 
 For an "AI layer audit" these are first-class targets: if the project has 47 skills, lowering `skillListingBudgetFraction` from `0.01` to `0.005` may free meaningful context without losing functionality — truncated skills still load on full description match. Going the other direction (`0.02`+) trades startup context for fewer auto-load misses; defensible for skill-light projects where the budget is dominated by something else.
 
@@ -178,6 +178,48 @@ Skills can execute shell via backtick-bang syntax (`` !`command` ``) inside SKIL
 **When to recommend setting it:** projects that install third-party skills from a marketplace, or projects with security-sensitive build environments. Default is unset (shell allowed).
 
 **Note on skill content lifecycle:** when context is compacted, skills loaded via `!`command`` may need to re-execute to refresh their dynamic content. Skill-heavy projects should be aware of the re-attach cost after compaction.
+
+---
+
+## G15. 🚫 `skillOverrides` is a per-skill record, not a top-level string
+
+The `skillOverrides` setting in `.claude/settings.json` (and the user-scope equivalent) takes a **record keyed by skill name**, with the override mode as the value. The override values (`on` / `name-only` / `user-invocable-only` / `off`) are documented and accurate — but they live *inside* the record, not as a top-level scalar.
+
+**Correct:**
+
+```json
+{
+  "skillOverrides": {
+    "some-skill-name": "off",
+    "another-skill": "user-invocable-only"
+  }
+}
+```
+
+Or, explicitly empty:
+
+```json
+{ "skillOverrides": {} }
+```
+
+**Wrong (Claude Code rejects the whole settings file):**
+
+```json
+{ "skillOverrides": "user-invocable-only" }
+```
+
+Error message from the loader: `Expected record, but received string`. The validation failure means the entire settings file is treated as invalid, not just the bad key — so a single wrong-typed `skillOverrides` can take down all your project-scope settings until corrected.
+
+**Why this caveat exists:** earlier versions of this skill (v3.0.0 / v3.0.1) listed the override values inline alongside the field name without showing the record shape. Real-world users (one as recently as today) parsed that as "the value to set" and broke their settings file. The current SKILL.md and the G11 row both now show the record shape explicitly.
+
+**Audit task (Fork E):** for every `.claude/settings.json` and `~/.claude/settings.json` with a `skillOverrides` key, verify the value is a JSON object (record), not a string. One-liner:
+
+```bash
+jq '.skillOverrides // empty | type' .claude/settings.json
+# Expected: "object". If "string" appears, the file is broken.
+```
+
+There is no documented "global default override" mode — if you want "set everything to X", enumerate the affected skills explicitly. The skill loader has no shorthand for blanket-disable.
 
 ---
 

@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-Skill-D97757?logo=anthropic&logoColor=white)](https://code.claude.com/docs/en)
-[![Version](https://img.shields.io/badge/Version-v3.0.1-blue)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-v3.0.2-blue)](CHANGELOG.md)
 [![GitHub stars](https://img.shields.io/github/stars/MJWNA/large-codebase-audit-skill?style=flat)](https://github.com/MJWNA/large-codebase-audit-skill/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/MJWNA/large-codebase-audit-skill)](https://github.com/MJWNA/large-codebase-audit-skill/issues)
 [![Last commit](https://img.shields.io/github/last-commit/MJWNA/large-codebase-audit-skill)](https://github.com/MJWNA/large-codebase-audit-skill/commits/main)
@@ -225,7 +225,7 @@ Each cycle produces:
 
 ## ⚠️ Operational caveats
 
-The skill operates on real Claude Code behaviour, not idealised behaviour. Full caveats with citations and mitigations live in [`docs/CAVEATS.md`](docs/CAVEATS.md) (14 operational gotchas). Best-practices items (DRI, cadence, skill bundling, `InstructionsLoaded` use, LSP location) live in [`SKILL.md`](SKILL.md) → *Best practices*. Highlights:
+The skill operates on real Claude Code behaviour, not idealised behaviour. Full caveats with citations and mitigations live in [`docs/CAVEATS.md`](docs/CAVEATS.md) (15 operational gotchas). Best-practices items (DRI, cadence, skill bundling, `InstructionsLoaded` use, LSP location) live in [`SKILL.md`](SKILL.md) → *Best practices*. Highlights:
 
 - 🔄 Path-scoped rules trigger on file READ, not Write/Create (issue #23478)
 - 🐛 Rules' `paths:` YAML-list form has parser quirks (issue #17204) — does NOT affect skills
@@ -240,6 +240,7 @@ The skill operates on real Claude Code behaviour, not idealised behaviour. Full 
 - 🧠 `MEMORY.md` cutoff is 200 lines OR 25KB; topic files load on demand
 - 📏 `skillListingBudgetFraction` default is **`0.01`** (1%), not 10%
 - 🗂️ Hook-invoked `claude -p` pollutes the `/resume` picker — add `--no-session-persistence` to suppress (CAVEAT G14)
+- 🚫 `skillOverrides` is a per-skill **record** (`{ "skill-name": "off" }`), NOT a top-level string — wrong type crashes settings.json validation (CAVEAT G15)
 
 ---
 

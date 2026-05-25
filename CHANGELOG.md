@@ -2,6 +2,37 @@
 
 All notable changes to `large-codebase-audit-skill` are documented here. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.2] — 2026-05-25
+
+Patch release. Documentation bug fix — caught when the bad doc broke a real user's settings file.
+
+### 🐛 Factual correction (settings-file breaker)
+
+- 🚫 **`skillOverrides` is a per-skill record, not a top-level string.** Three sites in v3.0.0 / v3.0.1 listed the override values (`on` / `name-only` / `user-invocable-only` / `off`) inline alongside the field name without showing the record shape. A user parsed it as "the value to set", wrote `"skillOverrides": "user-invocable-only"` into `.claude/settings.json`, and Claude Code rejected the entire file with `Expected record, but received string`. The override values themselves are correct — they live *inside* a `Record<skillName, override>`, not at the top level.
+
+### ✨ Added
+
+- 🆕 **CAVEAT G15** — full reproduction with correct/wrong examples + Fork E audit one-liner (`jq '.skillOverrides // empty | type'`).
+- 🪝 **Fork E audit prompt** now flags any `skillOverrides` value that isn't a JSON object.
+
+### 🔧 Corrected
+
+- 📐 **SKILL.md L43** (surfaces-table cross-cutting knobs section) — now shows `skillOverrides` as `Record<skillName, ...>` with explicit warning that string form is rejected.
+- 📐 **SKILL.md Fork E prompt** — `skillOverrides` now flagged as "per-skill record, NOT a top-level string" with cross-reference to G15.
+- 📐 **CAVEATS.md G11 table row** — `skillOverrides` description column now shows the record shape: `{ "skill-name": "off" / "name-only" / "user-invocable-only" / "on" }`.
+
+### 🔧 Bumped
+
+- `docs/CAVEATS.md` operational-gotcha count: 14 → 15
+- README + SKILL.md caveats summary: new G15 highlight added
+- Version badge: v3.0.1 → v3.0.2
+
+### 🔗 Why this matters
+
+Pure docs bug — but a settings-file-breaker, because Claude Code treats the entire settings file as invalid when a typed field fails validation. So a single wrong-typed `skillOverrides` takes down all project-scope settings (permissions, hooks, env, the lot) until corrected. The audit can now catch the wrong type before it lands.
+
+---
+
 ## [3.0.1] — 2026-05-22
 
 Patch release: catch a Stop-hook gotcha that doesn't surface until it bites you.
