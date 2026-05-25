@@ -23,15 +23,36 @@ The caveats doc (`docs/CAVEATS.md`) is the primary place this knowledge lands.
 
 ## Development setup
 
-There's no build step — the skill is a single SKILL.md plus reference docs and templates. To test changes:
+There's no build step — the skill is `SKILL.md` plus `docs/CAVEATS.md`. To test changes:
 
 ```bash
-# Copy your in-progress SKILL.md to user scope
+# Copy your in-progress files to user scope
 cp SKILL.md ~/.claude/skills/large-codebase-audit/SKILL.md
+cp docs/CAVEATS.md ~/.claude/skills/large-codebase-audit/docs/CAVEATS.md
 
 # Invoke from any Claude Code session
 > audit my AI layer
 ```
+
+### Maintainer-only: symlink user-scope to the repo
+
+If you're the maintainer (or a heavy iterator) editing this skill regularly, replace the user-scope copies with **symlinks** so every edit propagates instantly with no `cp` step:
+
+```bash
+REPO=$(pwd)  # run from the repo root
+rm ~/.claude/skills/large-codebase-audit/SKILL.md
+rm ~/.claude/skills/large-codebase-audit/docs/CAVEATS.md
+ln -s "$REPO/SKILL.md"           ~/.claude/skills/large-codebase-audit/SKILL.md
+ln -s "$REPO/docs/CAVEATS.md"    ~/.claude/skills/large-codebase-audit/docs/CAVEATS.md
+
+# Verify
+readlink ~/.claude/skills/large-codebase-audit/SKILL.md
+readlink ~/.claude/skills/large-codebase-audit/docs/CAVEATS.md
+```
+
+Claude Code's skill loader follows symlinks, so the skill description and content update the moment you save the repo file. Caveat: if you move or delete the repo, the symlinks dangle and the skill silently fails to load — restore by recreating the symlinks at the new path, or `cp` real files in as a fallback.
+
+This is **not recommended for end users** — Option A (cp) and Option C (git submodule) in the README are the right paths for installing the skill on a machine you don't develop it on.
 
 ## Style
 

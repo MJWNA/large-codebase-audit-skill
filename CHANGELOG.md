@@ -2,6 +2,28 @@
 
 All notable changes to `large-codebase-audit-skill` are documented here. Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.3] — 2026-05-25
+
+Polish release. No functional changes; the audit workflow and caveats behave identically. Two cleanup items merged via PR (the v3.0.0–v3.0.2 patches all went direct-to-`main`; this one goes through the PR workflow for review).
+
+### 🧹 Cleanup
+
+- 📐 **G14/G15 file ordering fixed.** v3.0.1 added G14 and v3.0.2 added G15 by inserting *before* G14, so the in-file order became `G1…G13, G15, G14`. The numerical IDs are stable identifiers (all cross-references already resolved correctly), but a reader scanning top-to-bottom hit them out of order. Swapped so the file now reads `G1…G15` in numerical order. Zero content change inside either caveat.
+
+### 📚 Docs
+
+- 📦 **`CONTRIBUTING.md` documents the maintainer symlink pattern.** Replaces user-scope copies with symlinks so every edit propagates instantly without a manual `cp` step. Explicitly flagged as maintainer-only — end users should keep using Option A (cp) or Option C (git submodule) from the README. Also updates the "Development setup" command block to include `docs/CAVEATS.md` (was SKILL.md only).
+
+### 🔧 Bumped
+
+- Version badge: v3.0.2 → v3.0.3
+
+### 🔗 Why this matters
+
+The v3.0.0 through v3.0.2 releases were committed straight to `main`. This patch is the first to land through a feature branch + PR, establishing the convention going forward. Future releases (v3.0.4+) should follow the same pattern — branch, PR, merge — both for review hygiene and so external contributors have a working example to mirror.
+
+---
+
 ## [3.0.2] — 2026-05-25
 
 Patch release. Documentation bug fix — caught when the bad doc broke a real user's settings file.
