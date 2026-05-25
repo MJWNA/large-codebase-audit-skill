@@ -31,8 +31,10 @@ build/
 *.log
 logs/
 
-# Claude Code session state — never commit
-.claude/session/
+# Claude Code session state
+# HANDOFF.md is developer-local (ephemeral state). DECISIONS.md and LEARNINGS.md
+# are tracked because they have compound team value for future maintainers.
+.claude/session/HANDOFF.md
 .claude/worktrees/
 .claude/scripts/*.local.sh
 .env.vercel
